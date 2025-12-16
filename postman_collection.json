@@ -1,0 +1,132 @@
+{
+  "info": {
+    "name": "Order Execution Engine API",
+    "description": "API collection for Order Execution Engine with DEX routing and WebSocket status updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Create Order (Market)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"market\",\n  \"tokenIn\": \"SOL\",\n  \"tokenOut\": \"USDC\",\n  \"amountIn\": \"100\",\n  \"slippageTolerance\": 1\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders/execute",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "execute"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Order by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders/:orderId",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", ":orderId"],
+          "variable": [
+            {
+              "key": "orderId",
+              "value": "{{order_id}}",
+              "description": "Order ID from create order response"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List All Orders",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Queue Statistics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/queue/stats",
+          "host": ["{{base_url}}"],
+          "path": ["api", "queue", "stats"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "WebSocket - Order Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Upgrade",
+            "value": "websocket"
+          },
+          {
+            "key": "Connection",
+            "value": "Upgrade"
+          }
+        ],
+        "url": {
+          "raw": "ws://{{base_url}}/api/orders/:orderId/status",
+          "protocol": "ws",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", ":orderId", "status"],
+          "variable": [
+            {
+              "key": "orderId",
+              "value": "{{order_id}}"
+            }
+          ]
+        },
+        "description": "WebSocket endpoint for real-time order status updates. Connect after creating an order to receive status updates: pending → routing → building → submitted → confirmed/failed"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
+
