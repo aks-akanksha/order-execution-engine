@@ -33,12 +33,18 @@ export async function buildApp() {
   // Initialize services
   logger.info('Initializing database...');
   try {
-    await initializeDatabase();
+    // Add timeout wrapper to prevent hanging
+    const initPromise = initializeDatabase();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database initialization timeout after 15 seconds')), 15000)
+    );
+    
+    await Promise.race([initPromise, timeoutPromise]);
     logger.info('Database initialized');
   } catch (error: any) {
     logger.error('Failed to initialize database', { 
       error: error?.message || error,
-      hint: 'Make sure DATABASE_URL is set and the database service is running and linked to this web service on Render.'
+      hint: 'Make sure DATABASE_URL is set and the database service is running and linked to this web service on Render. Check if DATABASE_URL includes port (usually :5432).'
     });
     throw error;
   }
