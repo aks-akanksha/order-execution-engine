@@ -72,16 +72,27 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     const orderId = (req.params as { orderId: string }).orderId;
     const orderProcessor = fastify.orderProcessor;
 
-    // Validate connection and socket
-    if (!connection || !connection.socket) {
-      logger.error('Invalid WebSocket connection', { orderId });
+    // Get socket - try connection.socket first, fallback to connection itself
+    const socket = (connection as any).socket || connection;
+
+    if (!connection) {
+      logger.error('Invalid WebSocket connection - connection is null', { orderId });
       return;
     }
 
-    const socket = connection.socket;
+    if (!socket) {
+      logger.error('Invalid WebSocket connection - socket is null', { 
+        orderId,
+        connectionType: typeof connection,
+        connectionKeys: connection ? Object.keys(connection) : []
+      });
+      return;
+    }
 
     if (!orderId) {
-      socket.close(1008, 'Order ID required');
+      if (socket.close) {
+        socket.close(1008, 'Order ID required');
+      }
       return;
     }
 
@@ -90,9 +101,14 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     // Status update callback
     const statusCallback = (update: { orderId: string; status: string; message?: string; data?: Record<string, unknown> }) => {
       try {
-        if (socket && socket.readyState === 1) {
+        const readyState = socket.readyState;
+        if (readyState === 1) { // WebSocket.OPEN
           // WebSocket.OPEN
-          socket.send(JSON.stringify(update));
+          if (socket.send) {
+            socket.send(JSON.stringify(update));
+          } else if (typeof socket === 'function') {
+            socket(JSON.stringify(update));
+          }
         }
       } catch (error: unknown) {
         logger.error(`Error sending status update for order ${orderId}`, { orderId, error });
@@ -108,45 +124,46 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     orderModel
       .findById(orderId)
       .then(async (order) => {
-        if (!socket || socket.readyState !== 1) {
+        const readyState = socket.readyState;
+        if (readyState !== 1) { // Not WebSocket.OPEN
           return; // Connection already closed
         }
 
-        if (order) {
-          socket.send(
-            JSON.stringify({
-              orderId: order.id,
-              status: order.status,
-              message: `Current status: ${order.status}`,
-            })
-          );
+        const message = JSON.stringify(
+          order
+            ? {
+                orderId: order.id,
+                status: order.status,
+                message: `Current status: ${order.status}`,
+              }
+            : {
+                orderId,
+                status: 'not_found',
+                message: 'Order not found',
+              }
+        );
 
-          // If order is still pending and not in queue, add it
-          if (order.status === OrderStatus.PENDING) {
-            const orderRequest = {
-              type: order.type,
-              tokenIn: order.tokenIn,
-              tokenOut: order.tokenOut,
-              amountIn: order.amountIn,
-              slippageTolerance: order.slippageTolerance,
-            };
-            // Re-add to queue if not already processing
-            // Callback is already registered above
-            try {
-              await queueService.addOrder(orderId, orderRequest);
-            } catch (error) {
-              // Order might already be in queue, that's fine
-              logger.debug(`Order ${orderId} may already be in queue`, { orderId, error });
-            }
+        if (socket.send) {
+          socket.send(message);
+        }
+
+        // If order is still pending and not in queue, add it
+        if (order && order.status === OrderStatus.PENDING) {
+          const orderRequest = {
+            type: order.type,
+            tokenIn: order.tokenIn,
+            tokenOut: order.tokenOut,
+            amountIn: order.amountIn,
+            slippageTolerance: order.slippageTolerance,
+          };
+          // Re-add to queue if not already processing
+          // Callback is already registered above
+          try {
+            await queueService.addOrder(orderId, orderRequest);
+          } catch (error) {
+            // Order might already be in queue, that's fine
+            logger.debug(`Order ${orderId} may already be in queue`, { orderId, error });
           }
-        } else {
-          socket.send(
-            JSON.stringify({
-              orderId,
-              status: 'not_found',
-              message: 'Order not found',
-            })
-          );
         }
       })
       .catch((error: unknown) => {
@@ -154,7 +171,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
       });
 
     // Handle connection close
-    if (socket) {
+    if (socket.on) {
       socket.on('close', () => {
         logger.info(`WebSocket connection closed for order ${orderId}`, { orderId });
         if (orderProcessor) {
@@ -169,6 +186,23 @@ export async function ordersRoutes(fastify: FastifyInstance) {
           orderProcessor.unregisterStatusCallback(orderId);
         }
       });
+    } else {
+      // Fallback: use connection's on method if available
+      if ((connection as any).on) {
+        (connection as any).on('close', () => {
+          logger.info(`WebSocket connection closed for order ${orderId}`, { orderId });
+          if (orderProcessor) {
+            orderProcessor.unregisterStatusCallback(orderId);
+          }
+        });
+
+        (connection as any).on('error', (error: unknown) => {
+          logger.error(`WebSocket error for order ${orderId}`, { orderId, error });
+          if (orderProcessor) {
+            orderProcessor.unregisterStatusCallback(orderId);
+          }
+        });
+      }
     }
   });
 
