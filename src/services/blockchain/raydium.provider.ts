@@ -72,7 +72,12 @@ export class RealRaydiumProvider implements IDEXProvider {
         estimatedGas: '0.000005', // SOL transaction fee
       };
     } catch (error) {
-      logger.error('Raydium quote error', { error, request });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Raydium quote error', { 
+        error: errorMessage,
+        request,
+        hint: 'Falling back to mock quote. This is normal if pools don\'t exist on devnet.'
+      });
       // Fallback to mock if real quote fails
       return this.getMockQuote(request);
     }
@@ -131,7 +136,12 @@ export class RealRaydiumProvider implements IDEXProvider {
         executionPrice: quote.price,
       };
     } catch (error) {
-      logger.error('Raydium swap error', { error, request });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Raydium swap error', { 
+        error: errorMessage,
+        request,
+        hint: 'Falling back to mock execution. This is normal if pools don\'t exist on devnet.'
+      });
       // Fallback to mock execution
       return this.getMockExecution(quote);
     }
@@ -149,32 +159,32 @@ export class RealRaydiumProvider implements IDEXProvider {
     }
 
     try {
-      // Fetch pools from Raydium API v3
-      const response = await fetch(`${RAYDIUM_API_V3}/pools/info/list`);
+      // Try Raydium API v3 with query parameters for specific token pair
+      const apiUrl = `${RAYDIUM_API_V3}/pools?baseMint=${tokenIn}&quoteMint=${tokenOut}`;
+      logger.debug('Fetching Raydium pools', { apiUrl, tokenIn, tokenOut });
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
       if (!response.ok) {
-        throw new Error(`Raydium API error: ${response.statusText}`);
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new Error(`Raydium API error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json() as { data?: RaydiumPoolInfo[] };
       const pools: RaydiumPoolInfo[] = data.data || [];
 
-      // Find pools matching our token pair
-      const matchingPools = pools.filter(pool => {
-        const mintA = pool.mintA.address;
-        const mintB = pool.mintB.address;
-        return (
-          (mintA === tokenIn && mintB === tokenOut) ||
-          (mintA === tokenOut && mintB === tokenIn)
-        );
-      });
-
-      if (matchingPools.length === 0) {
-        logger.warn('No matching pools found', { tokenIn, tokenOut });
+      if (pools.length === 0) {
+        logger.warn('No Raydium pools found for token pair', { tokenIn, tokenOut, apiUrl });
         return null;
       }
 
       // Select pool with highest liquidity
-      const bestPool = matchingPools.reduce((best, current) => {
+      const bestPool = pools.reduce((best, current) => {
         const bestLiquidity = parseFloat(best.tvl || '0');
         const currentLiquidity = parseFloat(current.tvl || '0');
         return currentLiquidity > bestLiquidity ? current : best;
@@ -192,7 +202,15 @@ export class RealRaydiumProvider implements IDEXProvider {
 
       return bestPool;
     } catch (error) {
-      logger.error('Error finding Raydium pool', { error, tokenIn, tokenOut });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('Error finding Raydium pool', { 
+        error: errorMessage,
+        errorStack,
+        tokenIn, 
+        tokenOut,
+        hint: 'Falling back to mock quote. This is normal if pools don\'t exist on devnet or API is unavailable.'
+      });
       return null;
     }
   }
