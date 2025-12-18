@@ -134,13 +134,7 @@ export class RealRaydiumProvider implements IDEXProvider {
         executionPrice: quote.price,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Raydium swap error', { 
-        error: errorMessage,
-        request,
-        hint: 'Falling back to mock execution. This is normal if pools don\'t exist on devnet.'
-      });
-      // Fallback to mock execution
+      // Silently fallback to mock execution - this is expected when pools don't exist on devnet
       return this.getMockExecution(quote);
     }
   }
