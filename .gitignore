@@ -11,7 +11,7 @@ coverage/
 .vscode/
 .idea/
 
-# Logs - keep directory structure but ignore log files
-logs/*.log
-!logs/README.md
+# Logs
+logs/
+*.log
 
