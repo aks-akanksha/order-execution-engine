@@ -70,7 +70,7 @@ export async function buildApp() {
   });
 
   // Serve demo page at root
-  app.get('/', async (request, reply) => {
+  app.get('/', async (_request, reply) => {
     const demoHtml = `
 <!DOCTYPE html>
 <html lang="en">
