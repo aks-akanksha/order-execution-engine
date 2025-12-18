@@ -411,8 +411,6 @@ fly redis create
 fly deploy
 ```
 
-See `DEPLOYMENT.md` for detailed instructions.
-
 ### Environment Variables for Production
 ```env
 NODE_ENV=production
