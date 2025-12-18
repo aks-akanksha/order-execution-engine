@@ -72,8 +72,16 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     const orderId = (req.params as { orderId: string }).orderId;
     const orderProcessor = fastify.orderProcessor;
 
+    // Validate connection and socket
+    if (!connection || !connection.socket) {
+      logger.error('Invalid WebSocket connection', { orderId });
+      return;
+    }
+
+    const socket = connection.socket;
+
     if (!orderId) {
-      connection.socket.close(1008, 'Order ID required');
+      socket.close(1008, 'Order ID required');
       return;
     }
 
@@ -82,9 +90,9 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     // Status update callback
     const statusCallback = (update: { orderId: string; status: string; message?: string; data?: Record<string, unknown> }) => {
       try {
-        if (connection.socket.readyState === 1) {
+        if (socket && socket.readyState === 1) {
           // WebSocket.OPEN
-          connection.socket.send(JSON.stringify(update));
+          socket.send(JSON.stringify(update));
         }
       } catch (error: unknown) {
         logger.error(`Error sending status update for order ${orderId}`, { orderId, error });
@@ -100,8 +108,12 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     orderModel
       .findById(orderId)
       .then(async (order) => {
+        if (!socket || socket.readyState !== 1) {
+          return; // Connection already closed
+        }
+
         if (order) {
-          connection.socket.send(
+          socket.send(
             JSON.stringify({
               orderId: order.id,
               status: order.status,
@@ -128,7 +140,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
             }
           }
         } else {
-          connection.socket.send(
+          socket.send(
             JSON.stringify({
               orderId,
               status: 'not_found',
@@ -142,20 +154,22 @@ export async function ordersRoutes(fastify: FastifyInstance) {
       });
 
     // Handle connection close
-    connection.socket.on('close', () => {
-      logger.info(`WebSocket connection closed for order ${orderId}`, { orderId });
-      if (orderProcessor) {
-        orderProcessor.unregisterStatusCallback(orderId);
-      }
-    });
+    if (socket) {
+      socket.on('close', () => {
+        logger.info(`WebSocket connection closed for order ${orderId}`, { orderId });
+        if (orderProcessor) {
+          orderProcessor.unregisterStatusCallback(orderId);
+        }
+      });
 
-    // Handle errors
-    connection.socket.on('error', (error: unknown) => {
-      logger.error(`WebSocket error for order ${orderId}`, { orderId, error });
-      if (orderProcessor) {
-        orderProcessor.unregisterStatusCallback(orderId);
-      }
-    });
+      // Handle errors
+      socket.on('error', (error: unknown) => {
+        logger.error(`WebSocket error for order ${orderId}`, { orderId, error });
+        if (orderProcessor) {
+          orderProcessor.unregisterStatusCallback(orderId);
+        }
+      });
+    }
   });
 
   // GET /api/orders/:orderId - Get order details
