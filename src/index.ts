@@ -32,8 +32,16 @@ export async function buildApp() {
 
   // Initialize services
   logger.info('Initializing database...');
-  await initializeDatabase();
-  logger.info('Database initialized');
+  try {
+    await initializeDatabase();
+    logger.info('Database initialized');
+  } catch (error: any) {
+    logger.error('Failed to initialize database', { 
+      error: error?.message || error,
+      hint: 'Make sure DATABASE_URL is set and the database service is running and linked to this web service on Render.'
+    });
+    throw error;
+  }
 
   logger.info('Creating services...');
   const orderModel = new OrderModel();
