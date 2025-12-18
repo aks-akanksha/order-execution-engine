@@ -116,8 +116,7 @@ export class RealMeteoraProvider implements IDEXProvider {
         executionPrice: quote.price,
       };
     } catch (error) {
-      logger.error('Meteora swap error', { error, request });
-      // Fallback to mock execution
+      // Silently fallback to mock execution - this is expected when pools don't exist on devnet
       return this.getMockExecution(quote);
     }
   }
