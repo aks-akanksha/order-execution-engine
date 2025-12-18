@@ -25,11 +25,46 @@ export function getPool(): Pool {
   return pool;
 }
 
-export async function initializeDatabase(): Promise<void> {
+export async function testConnection(): Promise<boolean> {
   const pool = getPool();
+  try {
+    await pool.query('SELECT 1');
+    return true;
+  } catch (error) {
+    logger.error('Database connection test failed', { error });
+    return false;
+  }
+}
+
+export async function initializeDatabase(): Promise<void> {
+  // Check if DATABASE_URL is set
+  if (!process.env.DATABASE_URL) {
+    const errorMsg = 'DATABASE_URL environment variable is not set. Please configure your database connection.';
+    logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  const pool = getPool();
+
+  // Test connection first
+  try {
+    await pool.query('SELECT 1');
+    logger.info('Database connection successful');
+  } catch (error: any) {
+    const errorMsg = `Cannot connect to database. Please check your DATABASE_URL. Error: ${error?.message || error}`;
+    logger.error(errorMsg, { 
+      error,
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      databaseUrlPreview: process.env.DATABASE_URL ? `${process.env.DATABASE_URL.substring(0, 20)}...` : 'not set'
+    });
+    throw new Error(errorMsg);
+  }
 
   try {
     const schemaPath = path.join(__dirname, 'schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      throw new Error(`Schema file not found at ${schemaPath}`);
+    }
     const schema = fs.readFileSync(schemaPath, 'utf8');
     await pool.query(schema);
     logger.info('Database schema initialized successfully');
