@@ -357,13 +357,13 @@ npm run dev
 
 ## 🔧 Git Workflow
 
-For step-by-step commits (as requested), use the commit helper script:
+Use standard git commands for commits:
 
 ```bash
-./scripts/commit-helper.sh
+git add .
+git commit -m "feat: your feature description"
+git push
 ```
-
-This script helps create human-like commit messages based on your changes.
 
 ## 🚀 Deployment
 
@@ -457,7 +457,6 @@ MIT
 - **GitHub Repository**: https://github.com/aks-akanksha/order-execution-engine
 - **API Documentation**: See README.md above
 - **Deployment URL**: https://order-execution-engine-mqmu.onrender.com
-- **Deployment Guide**: See `DEPLOYMENT.md` for detailed deployment instructions
 - **Demo Video**: [Add your YouTube video link when ready]
 
 ---
