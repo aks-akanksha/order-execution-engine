@@ -84,22 +84,26 @@ export class MeteoraProvider implements IDEXProvider {
 }
 
 // Factory function to create DEX router with all providers
+// NOTE: Using mock providers by default to reduce memory usage on free tier
 export function createDEXRouter(): DEXRouter {
   const providers = new Map<DEX, IDEXProvider>();
-  const useRealBlockchain = process.env.USE_REAL_BLOCKCHAIN === 'true';
-  const network = (process.env.SOLANA_NETWORK as 'devnet' | 'mainnet-beta' | 'testnet') || 'devnet';
-
-  if (useRealBlockchain) {
-    // Use real blockchain providers
+  
+  // Always use mock providers - real blockchain requires too much memory for free tier
+  // To enable real blockchain, set USE_REAL_BLOCKCHAIN=true (not recommended on free tier)
+  const useRealBlockchain = false; // Force to false to prevent memory issues
+  
+  if (useRealBlockchain && process.env.USE_REAL_BLOCKCHAIN === 'true') {
+    // Use real blockchain providers (disabled by default)
     const { SolanaConnection } = require('./blockchain/solana.connection');
     const { RealRaydiumProvider } = require('./blockchain/raydium.provider');
     const { RealMeteoraProvider } = require('./blockchain/meteora.provider');
 
+    const network = (process.env.SOLANA_NETWORK as 'devnet' | 'mainnet-beta' | 'testnet') || 'devnet';
     const solana = new SolanaConnection(network);
     providers.set(DEX.RAYDIUM, new RealRaydiumProvider(solana));
     providers.set(DEX.METEORA, new RealMeteoraProvider(solana));
   } else {
-    // Use mock providers (default)
+    // Use mock providers (default - recommended for free tier)
     providers.set(DEX.RAYDIUM, new RaydiumProvider());
     providers.set(DEX.METEORA, new MeteoraProvider());
   }
