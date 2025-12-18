@@ -1,22 +1,12 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { orderRequestSchema } from '../validators/order.validator';
 import { OrderType, OrderStatus } from '../types/order';
-import { OrderModel } from '../models/order.model';
-import { QueueService } from '../services/queue.service';
 import { v4 as uuidv4 } from 'uuid';
-
-interface OrderRequestBody {
-  type: OrderType;
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: string;
-  slippageTolerance?: number;
-  limitPrice?: string;
-}
+import { logger } from '../utils/logger';
 
 export async function ordersRoutes(fastify: FastifyInstance) {
-  const orderModel = fastify.orderModel as OrderModel;
-  const queueService = fastify.queueService as QueueService;
+  const orderModel = fastify.orderModel;
+  const queueService = fastify.queueService;
 
   // POST /api/orders/execute - Creates order and returns orderId
   // Client should then connect to WebSocket endpoint for status updates
@@ -69,7 +59,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
         message: 'Order queued for processing. Connect to WebSocket endpoint for live updates.',
       });
     } catch (error) {
-      console.error('Error creating order:', error);
+      logger.error('Error creating order', { error });
       return reply.status(500).send({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -80,24 +70,24 @@ export async function ordersRoutes(fastify: FastifyInstance) {
   // WebSocket endpoint for order status updates
   fastify.get('/api/orders/:orderId/status', { websocket: true }, (connection, req) => {
     const orderId = (req.params as { orderId: string }).orderId;
-    const orderProcessor = (fastify as any).orderProcessor as any;
+    const orderProcessor = fastify.orderProcessor;
 
     if (!orderId) {
       connection.socket.close(1008, 'Order ID required');
       return;
     }
 
-    console.log(`WebSocket connection established for order ${orderId}`);
+    logger.info(`WebSocket connection established for order ${orderId}`, { orderId });
 
     // Status update callback
-    const statusCallback = (update: any) => {
+    const statusCallback = (update: { orderId: string; status: string; message?: string; data?: Record<string, unknown> }) => {
       try {
         if (connection.socket.readyState === 1) {
           // WebSocket.OPEN
           connection.socket.send(JSON.stringify(update));
         }
-      } catch (error) {
-        console.error(`Error sending status update for order ${orderId}:`, error);
+      } catch (error: unknown) {
+        logger.error(`Error sending status update for order ${orderId}`, { orderId, error });
       }
     };
 
@@ -134,7 +124,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
               await queueService.addOrder(orderId, orderRequest);
             } catch (error) {
               // Order might already be in queue, that's fine
-              console.log(`Order ${orderId} may already be in queue`);
+              logger.debug(`Order ${orderId} may already be in queue`, { orderId, error });
             }
           }
         } else {
@@ -147,21 +137,21 @@ export async function ordersRoutes(fastify: FastifyInstance) {
           );
         }
       })
-      .catch((error) => {
-        console.error(`Error fetching initial status for order ${orderId}:`, error);
+      .catch((error: unknown) => {
+        logger.error(`Error fetching initial status for order ${orderId}`, { orderId, error });
       });
 
     // Handle connection close
     connection.socket.on('close', () => {
-      console.log(`WebSocket connection closed for order ${orderId}`);
+      logger.info(`WebSocket connection closed for order ${orderId}`, { orderId });
       if (orderProcessor) {
         orderProcessor.unregisterStatusCallback(orderId);
       }
     });
 
     // Handle errors
-    connection.socket.on('error', (error) => {
-      console.error(`WebSocket error for order ${orderId}:`, error);
+    connection.socket.on('error', (error: unknown) => {
+      logger.error(`WebSocket error for order ${orderId}`, { orderId, error });
       if (orderProcessor) {
         orderProcessor.unregisterStatusCallback(orderId);
       }
@@ -180,7 +170,8 @@ export async function ordersRoutes(fastify: FastifyInstance) {
 
       return reply.send(order);
     } catch (error) {
-      console.error('Error fetching order:', error);
+      const orderId = (request.params as { orderId: string }).orderId;
+      logger.error('Error fetching order', { orderId, error });
       return reply.status(500).send({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -189,14 +180,14 @@ export async function ordersRoutes(fastify: FastifyInstance) {
   });
 
   // GET /api/orders - List orders (with pagination)
-  fastify.get('/api/orders', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/api/orders', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       // Simple implementation - in production, add pagination
       const query = 'SELECT *, created_at as "createdAt", updated_at as "updatedAt" FROM orders ORDER BY created_at DESC LIMIT 100';
       const result = await (orderModel as any).pool.query(query);
       return reply.send(result.rows);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
+    } catch (error: unknown) {
+      logger.error('Error fetching orders', { error });
       return reply.status(500).send({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -205,12 +196,12 @@ export async function ordersRoutes(fastify: FastifyInstance) {
   });
 
   // GET /api/queue/stats - Get queue statistics
-  fastify.get('/api/queue/stats', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/api/queue/stats', async (_request, reply: FastifyReply) => {
     try {
       const stats = await queueService.getQueueStats();
       return reply.send(stats);
     } catch (error) {
-      console.error('Error fetching queue stats:', error);
+      logger.error('Error fetching queue stats', { error });
       return reply.status(500).send({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',

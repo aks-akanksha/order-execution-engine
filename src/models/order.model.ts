@@ -1,9 +1,9 @@
 import { Pool } from 'pg';
 import { getPool } from '../database/db';
-import { Order, OrderStatus, OrderType } from '../types/order';
+import { Order, OrderStatus, OrderType, DEX } from '../types/order';
 
 export class OrderModel {
-  private pool: Pool;
+  public pool: Pool;
 
   constructor() {
     this.pool = getPool();
@@ -59,7 +59,7 @@ export class OrderModel {
     updates?: Partial<Pick<Order, 'selectedDex' | 'executionPrice' | 'txHash' | 'error' | 'amountOut'>>
   ): Promise<Order> {
     const updateFields: string[] = ['status = $2', 'updated_at = CURRENT_TIMESTAMP'];
-    const values: any[] = [id, status];
+    const values: (string | number | null)[] = [id, status];
     let paramIndex = 3;
 
     if (updates?.selectedDex) {
@@ -100,14 +100,14 @@ export class OrderModel {
     `;
 
     const result = await this.pool.query(query, values);
-    return this.mapRowToOrder(result.rows[0]);
+    return this.mapRowToOrder(result.rows[0] as Record<string, unknown>);
   }
 
   async addStatusHistory(
     orderId: string,
     status: OrderStatus,
     message?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     const query = `
       INSERT INTO order_status_history (order_id, status, message, metadata)
@@ -117,23 +117,23 @@ export class OrderModel {
     await this.pool.query(query, [orderId, status, message || null, metadata ? JSON.stringify(metadata) : null]);
   }
 
-  private mapRowToOrder(row: any): Order {
+  private mapRowToOrder(row: Record<string, unknown>): Order {
     return {
-      id: row.id,
-      userId: row.user_id,
+      id: String(row.id),
+      userId: row.user_id ? String(row.user_id) : undefined,
       type: row.type as OrderType,
-      tokenIn: row.token_in,
-      tokenOut: row.token_out,
-      amountIn: row.amount_in.toString(),
-      amountOut: row.amount_out ? row.amount_out.toString() : undefined,
-      slippageTolerance: parseFloat(row.slippage_tolerance),
+      tokenIn: String(row.token_in),
+      tokenOut: String(row.token_out),
+      amountIn: String(row.amount_in),
+      amountOut: row.amount_out ? String(row.amount_out) : undefined,
+      slippageTolerance: parseFloat(String(row.slippage_tolerance)),
       status: row.status as OrderStatus,
-      selectedDex: row.selected_dex,
-      executionPrice: row.execution_price ? row.execution_price.toString() : undefined,
-      txHash: row.tx_hash,
-      error: row.error,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
+      selectedDex: row.selected_dex ? (row.selected_dex as DEX) : undefined,
+      executionPrice: row.execution_price ? String(row.execution_price) : undefined,
+      txHash: row.tx_hash ? String(row.tx_hash) : undefined,
+      error: row.error ? String(row.error) : undefined,
+      createdAt: row.createdAt as Date,
+      updatedAt: row.updatedAt as Date,
     };
   }
 }

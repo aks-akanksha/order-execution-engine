@@ -1,7 +1,7 @@
-import { Order, OrderStatus, OrderRequest, OrderStatusUpdate, DEX } from '../types/order';
+import { Order, OrderStatus, OrderRequest, OrderStatusUpdate } from '../types/order';
 import { OrderModel } from '../models/order.model';
 import { DEXRouter } from './dex.router';
-import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../utils/logger';
 
 export class OrderProcessor {
   private orderModel: OrderModel;
@@ -42,7 +42,13 @@ export class OrderProcessor {
 
         if (retryCount < maxRetries) {
           const backoffMs = Math.pow(2, retryCount) * 1000; // Exponential backoff
-          console.log(`Order ${orderId} failed, retrying in ${backoffMs}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          logger.warn(`Order ${orderId} failed, retrying`, {
+            orderId,
+            attempt: retryCount + 1,
+            maxRetries,
+            backoffMs,
+            error: lastError?.message,
+          });
           await this.delay(backoffMs);
         }
       }

@@ -15,5 +15,13 @@ module.exports = {
   coverageDirectory: 'coverage',
   moduleFileExtensions: ['ts', 'js', 'json'],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
+  testTimeout: 30000, // 30 seconds for tests with retries
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        types: ['jest', 'node'],
+      },
+    },
+  },
 };
 

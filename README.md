@@ -2,6 +2,10 @@
 
 A high-performance order execution engine with DEX routing and real-time WebSocket status updates. This system processes market orders by comparing prices across multiple DEXs (Raydium and Meteora) and routing to the best execution venue.
 
+## 🚀 Real Blockchain Integration (NEW!)
+
+The engine now supports **real Solana devnet execution** with actual Raydium and Meteora SDKs! Enable it by setting `USE_REAL_BLOCKCHAIN=true` in your environment variables. See [BLOCKCHAIN_INTEGRATION.md](./BLOCKCHAIN_INTEGRATION.md) for details.
+
 ## 🎯 Design Decisions
 
 ### Why Market Orders?
@@ -363,6 +367,52 @@ This script helps create human-like commit messages based on your changes.
 
 ## 🚀 Deployment
 
+### Live Demo
+
+**Deployed URL**: https://order-execution-engine-mqmu.onrender.com
+
+Once deployed, the API will be available at:
+- **Health Check**: `GET https://your-deployment-url.com/health`
+- **Create Order**: `POST https://your-deployment-url.com/api/orders/execute`
+- **WebSocket**: `wss://your-deployment-url.com/api/orders/:orderId/status`
+
+### Quick Deploy Options
+
+#### Option 1: Render (Recommended - Free Tier)
+
+1. **Sign up at [Render.com](https://render.com)**
+2. **Create PostgreSQL Database:**
+   - New → PostgreSQL
+   - Copy Internal Database URL
+3. **Create Redis Instance:**
+   - New → Redis
+   - Copy Internal Redis URL
+4. **Deploy Web Service:**
+   - New → Web Service
+   - Connect GitHub repository
+   - Build Command: `npm ci && npm run build`
+   - Start Command: `node dist/index.js`
+   - Add environment variables (see below)
+
+#### Option 2: Railway
+
+1. **Sign up at [Railway.app](https://railway.app)**
+2. **New Project → Deploy from GitHub**
+3. **Add PostgreSQL** (auto-configured)
+4. **Add Redis** (auto-configured)
+5. Railway auto-deploys on push
+
+#### Option 3: Fly.io
+
+```bash
+fly launch
+fly postgres create
+fly redis create
+fly deploy
+```
+
+See `DEPLOYMENT.md` for detailed instructions.
+
 ### Environment Variables for Production
 ```env
 NODE_ENV=production
@@ -371,16 +421,17 @@ DATABASE_URL=postgresql://user:pass@host:5432/order_engine
 REDIS_HOST=redis-host
 REDIS_PORT=6379
 REDIS_PASSWORD=your-redis-password
+QUEUE_CONCURRENCY=10
+ORDERS_PER_MINUTE=100
 ```
 
-### Docker Deployment (Optional)
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-CMD ["node", "dist/index.js"]
+### Docker Deployment
+
+A `Dockerfile` is included for containerized deployment:
+
+```bash
+docker build -t order-execution-engine .
+docker run -p 3000:3000 --env-file .env order-execution-engine
 ```
 
 ## 📊 Monitoring
@@ -403,10 +454,11 @@ MIT
 
 ## 🔗 Links
 
-- **GitHub Repository**: [Add your repo URL]
-- **API Documentation**: [Add your docs URL]
-- **Deployment URL**: [Add your deployment URL]
-- **Demo Video**: [Add your YouTube video link]
+- **GitHub Repository**: https://github.com/aks-akanksha/order-execution-engine
+- **API Documentation**: See README.md above
+- **Deployment URL**: https://order-execution-engine-mqmu.onrender.com
+- **Deployment Guide**: See `DEPLOYMENT.md` for detailed deployment instructions
+- **Demo Video**: [Add your YouTube video link when ready]
 
 ---
 

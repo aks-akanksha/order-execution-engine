@@ -1,9 +1,10 @@
 import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
-import { OrderRequest, OrderStatus } from '../types/order';
+import { OrderRequest } from '../types/order';
 import { OrderModel } from '../models/order.model';
 import { OrderProcessor } from './order.processor';
 import { DEXRouter } from './dex.router';
+import { logger } from '../utils/logger';
 
 export class QueueService {
   private queue: Queue;
@@ -21,6 +22,8 @@ export class QueueService {
       port: parseInt(process.env.REDIS_PORT || '6379'),
       password: process.env.REDIS_PASSWORD || undefined,
       maxRetriesPerRequest: null,
+      enableOfflineQueue: false,
+      lazyConnect: true,
     });
 
     this.queue = new Queue('order-execution', {
@@ -56,7 +59,7 @@ export class QueueService {
           const order = await this.orderProcessor.processOrder(orderId, request);
           return { success: true, order };
         } catch (error) {
-          console.error(`Job ${job.id} failed:`, error);
+          logger.error(`Job ${job.id} failed`, { jobId: job.id, error });
           throw error;
         }
       },
@@ -71,11 +74,11 @@ export class QueueService {
     );
 
     this.worker.on('completed', (job) => {
-      console.log(`Job ${job.id} completed successfully`);
+      logger.info(`Job ${job.id} completed successfully`, { jobId: job.id });
     });
 
     this.worker.on('failed', (job, err) => {
-      console.error(`Job ${job?.id} failed:`, err);
+      logger.error(`Job ${job?.id} failed`, { jobId: job?.id, error: err });
     });
   }
 

@@ -11,7 +11,8 @@ jest.mock('pg', () => {
       query: mockQuery,
       connect: jest.fn(),
       end: jest.fn(),
-    })),
+      on: jest.fn(),
+    })) as unknown as jest.Mock,
   };
 });
 
@@ -20,10 +21,12 @@ describe('OrderModel', () => {
   let mockPool: jest.Mocked<Pool>;
 
   beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Pool = require('pg').Pool;
     mockPool = new Pool() as jest.Mocked<Pool>;
     orderModel = new OrderModel();
-    (orderModel as any).pool = mockPool;
+    // Access the private pool property for testing
+    (orderModel as unknown as { pool: jest.Mocked<Pool> }).pool = mockPool;
   });
 
   describe('create', () => {
@@ -53,7 +56,7 @@ describe('OrderModel', () => {
         command: 'INSERT',
         oid: 0,
         fields: [],
-      });
+      } as never);
 
       const order = await orderModel.create({
         id: orderId,
@@ -99,7 +102,7 @@ describe('OrderModel', () => {
         command: 'SELECT',
         oid: 0,
         fields: [],
-      });
+      } as never);
 
       const order = await orderModel.findById(orderId);
 
@@ -115,7 +118,7 @@ describe('OrderModel', () => {
         command: 'SELECT',
         oid: 0,
         fields: [],
-      });
+      } as never);
 
       const order = await orderModel.findById('non-existent-id');
 
@@ -150,7 +153,7 @@ describe('OrderModel', () => {
         command: 'UPDATE',
         oid: 0,
         fields: [],
-      });
+      } as never);
 
       const order = await orderModel.updateStatus(orderId, OrderStatus.CONFIRMED, {
         txHash: 'test_hash',
@@ -168,21 +171,26 @@ describe('OrderModel', () => {
     it('should add status history entry', async () => {
       const orderId = uuidv4();
 
+      // Clear any previous calls
+      mockPool.query.mockClear();
+
       mockPool.query.mockResolvedValue({
         rows: [],
         rowCount: 1,
         command: 'INSERT',
         oid: 0,
         fields: [],
-      });
+      } as never);
 
       await orderModel.addStatusHistory(orderId, OrderStatus.PENDING, 'Order created', {
         test: 'data',
       });
 
       expect(mockPool.query).toHaveBeenCalled();
-      const callArgs = mockPool.query.mock.calls[0];
-      expect(callArgs[0]).toContain('INSERT INTO order_status_history');
+      // Get the last call (should be addStatusHistory)
+      const calls = mockPool.query.mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toContain('INSERT INTO order_status_history');
     });
   });
 });

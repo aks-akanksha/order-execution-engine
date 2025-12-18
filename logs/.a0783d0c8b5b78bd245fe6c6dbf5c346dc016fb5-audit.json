@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "/home/akanksha/Desktop/projects/order_execution_engine/logs/.a0783d0c8b5b78bd245fe6c6dbf5c346dc016fb5-audit.json",
+    "files": [
+        {
+            "date": 1765904935061,
+            "name": "/home/akanksha/Desktop/projects/order_execution_engine/logs/error-2025-12-16.log",
+            "hash": "e8aaca7da5309344af242d3c1abd146e8d9edcc5b39ac181357d902726fef305"
+        },
+        {
+            "date": 1765965207881,
+            "name": "/home/akanksha/Desktop/projects/order_execution_engine/logs/error-2025-12-17.log",
+            "hash": "048cfc6687a678185431c0a2c9de94458ebe8b702189732b7be713e50310b394"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -1,4 +1,5 @@
 import { DEXQuote, DEX, OrderRequest } from '../types/order';
+import { logger } from '../utils/logger';
 
 export interface IDEXProvider {
   getQuote(request: OrderRequest): Promise<DEXQuote>;
@@ -21,7 +22,7 @@ export class DEXRouter {
         const quote = await provider.getQuote(request);
         return quote;
       } catch (error) {
-        console.error(`Error fetching quote from ${dex}:`, error);
+        logger.error(`Error fetching quote from ${dex}`, { dex, error });
         return null;
       }
     });
@@ -40,8 +41,11 @@ export class DEXRouter {
       return currentAmount > bestAmount ? current : best;
     });
 
-    console.log(`DEX Routing Decision: Selected ${bestQuote.dex} with output ${bestQuote.amountOut}`);
-    console.log(`All quotes:`, quotes.map(q => `${q.dex}: ${q.amountOut}`).join(', '));
+    logger.info('DEX Routing Decision', {
+      selectedDex: bestQuote.dex,
+      outputAmount: bestQuote.amountOut,
+      allQuotes: quotes.map(q => ({ dex: q.dex, amountOut: q.amountOut })),
+    });
 
     return bestQuote;
   }

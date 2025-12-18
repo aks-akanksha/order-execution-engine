@@ -22,7 +22,7 @@ export class RaydiumProvider implements IDEXProvider {
   }
 
   async executeSwap(
-    request: OrderRequest,
+    _request: OrderRequest,
     quote: DEXQuote
   ): Promise<{ txHash: string; executionPrice: string }> {
     // Simulate transaction building and submission (1-2 seconds)
@@ -63,7 +63,7 @@ export class MeteoraProvider implements IDEXProvider {
   }
 
   async executeSwap(
-    request: OrderRequest,
+    _request: OrderRequest,
     quote: DEXQuote
   ): Promise<{ txHash: string; executionPrice: string }> {
     // Simulate transaction building and submission (1-2 seconds)
@@ -86,8 +86,23 @@ export class MeteoraProvider implements IDEXProvider {
 // Factory function to create DEX router with all providers
 export function createDEXRouter(): DEXRouter {
   const providers = new Map<DEX, IDEXProvider>();
-  providers.set(DEX.RAYDIUM, new RaydiumProvider());
-  providers.set(DEX.METEORA, new MeteoraProvider());
+  const useRealBlockchain = process.env.USE_REAL_BLOCKCHAIN === 'true';
+  const network = (process.env.SOLANA_NETWORK as 'devnet' | 'mainnet-beta' | 'testnet') || 'devnet';
+
+  if (useRealBlockchain) {
+    // Use real blockchain providers
+    const { SolanaConnection } = require('./blockchain/solana.connection');
+    const { RealRaydiumProvider } = require('./blockchain/raydium.provider');
+    const { RealMeteoraProvider } = require('./blockchain/meteora.provider');
+
+    const solana = new SolanaConnection(network);
+    providers.set(DEX.RAYDIUM, new RealRaydiumProvider(solana));
+    providers.set(DEX.METEORA, new RealMeteoraProvider(solana));
+  } else {
+    // Use mock providers (default)
+    providers.set(DEX.RAYDIUM, new RaydiumProvider());
+    providers.set(DEX.METEORA, new MeteoraProvider());
+  }
 
   return new DEXRouter(providers);
 }

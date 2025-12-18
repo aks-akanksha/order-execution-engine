@@ -8,12 +8,15 @@ import { createDEXRouter } from './services/dex.providers';
 import { QueueService } from './services/queue.service';
 import { OrderProcessor } from './services/order.processor';
 import { ordersRoutes } from './routes/orders.routes';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 export async function buildApp() {
+  logger.info('Building Fastify application');
+  
   const app = Fastify({
     logger: {
       level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -28,12 +31,16 @@ export async function buildApp() {
   await app.register(websocket);
 
   // Initialize services
+  logger.info('Initializing database...');
   await initializeDatabase();
+  logger.info('Database initialized');
 
+  logger.info('Creating services...');
   const orderModel = new OrderModel();
   const dexRouter = createDEXRouter();
   const queueService = new QueueService(orderModel, dexRouter);
   const orderProcessor = new OrderProcessor(orderModel, dexRouter);
+  logger.info('Services created');
 
   // Store services in Fastify instance for route access
   app.decorate('orderModel', orderModel);
@@ -56,23 +63,27 @@ async function start() {
     const app = await buildApp();
 
     await app.listen({ port: PORT, host: '0.0.0.0' });
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    logger.info(`🚀 Server running on http://localhost:${PORT}`, { port: PORT });
 
     // Graceful shutdown
     const shutdown = async () => {
-      console.log('Shutting down gracefully...');
+      logger.info('Shutting down gracefully...');
       await app.close();
       await closeDatabase();
+      logger.info('Shutdown complete');
       process.exit(0);
     };
 
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
   } catch (error) {
-    console.error('Error starting server:', error);
+    logger.error('Error starting server', { error });
     process.exit(1);
   }
 }
 
-start();
+// Only start server if this file is run directly (not imported for tests)
+if (require.main === module) {
+  start();
+}
 
